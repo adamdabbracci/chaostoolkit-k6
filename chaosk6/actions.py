@@ -8,7 +8,7 @@ from pathlib import Path
 __all__ = ["run_script", "stress_endpoint"]
 
 
-def run_script(scriptPath: str = None, vus: int = 1, duration: str = "1s", log_file: str = None):
+def run_script(script_path: str = None, vus: int = 1, duration: str = "1s", log_file: str = None,  debug: bool = False):
     """
     Run an arbitrary k6 script with a configurable amount of VUs and duration.
     Depending on the specs of the attacking machine, possible VU amount may
@@ -17,7 +17,7 @@ def run_script(scriptPath: str = None, vus: int = 1, duration: str = "1s", log_f
 
     Parameters
     ----------
-    scriptPath : str
+    script_path : str
       Full path to the k6 test script
     vus : int
       Amount of virtual users to run the test with
@@ -26,11 +26,19 @@ def run_script(scriptPath: str = None, vus: int = 1, duration: str = "1s", log_f
     log_file: str
       (Optional) Relative path to the file where output should be logged.
     """
+    logger.info("Running " + script_path)
+    _runScript(
+        script=script_path,
+        vus=vus,
+        duration=duration,
+        log_file=log_file,
+        debug=debug
+    )
+
+
+def stress_endpoint(endpoint: str = None, vus: int = 1, duration: str = "1s", log_file: str = None, debug: bool = False):
     logger.info("Running " + scriptPath)
-    _runScript(scriptPath, vus, duration, log_file)
-
-
-def stress_endpoint(endpoint: str = None, vus: int = 1, duration: str = "1s", log_file: str = None):
+    _runScript(scriptPath, vus, duration, debug)
     """
     Stress a single endpoint with a configurable amount of VUs and duration.
     Depending on the specs of the attacking machine, possible VU amount may
@@ -58,8 +66,15 @@ def stress_endpoint(endpoint: str = None, vus: int = 1, duration: str = "1s", lo
     )
 
     env = dict(**os.environ, CHAOS_K6_URL=endpoint)
-    r = _runScript(jsPath + "/single-endpoint.js",
-                   vus, duration, log_file, env)
+    r = _runScript(
+        script=jsPath + "/single-endpoint.js",
+        vus=vus,
+        duration=duration,
+        log_file=log_file,
+        environ=env,
+        debug=debug)
+
+    r = _runScript(jsPath + "/single-endpoint.js", vus, duration, env, debug)
     logger.info("Stressing completed.")
     if log_file != None:
         logger.info("Logged K6 output to {}.".format(log_file))
@@ -72,12 +87,19 @@ def _runScript(
     duration: str,
     log_file: str,
     environ: dict = None,
+    debug: bool = False
 ):
 
     if not environ:
         environ = dict(os.environ)
     command = [
-        "k6", "run", script, "--vus", str(vus), "--duration", str(duration)
+        "k6",
+        "run",
+        "-quiet",
+        script,
+        "--vus", str(vus),
+        "--duration",
+        str(duration)
     ]
 
     # Default output to the void
@@ -87,19 +109,19 @@ def _runScript(
         pipeoutput = open(log_file, "w")
 
     with subprocess.Popen(
-        command, stderr=subprocess.STDOUT, stdout=pipeoutput, env=environ
+        command, stderr=subprocess.STDOUT, stdout=None if debug is True else pipeoutput, env=environ
     ) as p:
         return p.returncode is None
 
 
-def runScript(scriptPath: str = None, vus: int = 1, duration: str = "1s"):
+def runScript(script_path: str = None, vus: int = 1, duration: str = "1s", debug: bool = False):
     warn_about_moved_function(
         "The action `runScript` is now called `run_script`."
         "Please consider updating your experiments accordingly.")
-    return run_script(scriptPath,  vus, duration)
+    return run_script(script_path,  vus, duration)
 
 
-def stressEndpoint(endpoint: str = None, vus: int = 1, duration: str = "1s"):
+def stressEndpoint(endpoint: str = None, vus: int = 1, duration: str = "1s", debug: bool = False):
     warn_about_moved_function(
         "The action `stressEndpoint` is now called `stress_endpoint`."
         "Please consider updating your experiments accordingly.")
